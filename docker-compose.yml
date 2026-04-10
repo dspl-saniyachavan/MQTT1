@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pp_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-precision_pulse}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-precision_pulse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: pp_mosquitto
+    ports:
+      - "18883:18883"
+    volumes:
+      - ./dspl-precision-pulse-backend/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./dspl-precision-pulse-backend/config/ca.crt:/mosquitto/config/ca.crt:ro
+      - ./dspl-precision-pulse-backend/config/server.crt:/mosquitto/config/server.crt:ro
+      - ./dspl-precision-pulse-backend/config/server.key:/mosquitto/config/server.key:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./dspl-precision-pulse-backend
+      dockerfile: Dockerfile
+    container_name: pp_backend
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@pp_postgres:5432/precision_pulse}
+      JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY: ${SECRET_KEY}
+      FLASK_ENV: production
+      FLASK_APP: run.py
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "18883"
+      MQTT_USE_TLS: "true"
+      MQTT_CA_CERTS: config/ca.crt
+      SQLITE_DB_PATH: /app/data/precision_pulse.db
+    volumes:
+      - desktop_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/internal/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  streamer:
+    build:
+      context: ./dspl-precision-pulse-desktop
+      dockerfile: Dockerfile
+    container_name: pp_streamer
+    volumes:
+      - desktop_data:/app/data
+    environment:
+      BACKEND_URL: http://backend:5000
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "18883"
+      MQTT_USE_TLS: "true"
+      MQTT_CA_CERTS: config/ca.crt
+      DEVICE_ID: ${DEVICE_ID:-desktop-001}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./dspl-precision-pulse-frontend
+      dockerfile: Dockerfile
+    container_name: pp_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:5000}
+      NEXT_PUBLIC_SOCKETIO_URL: ${NEXT_PUBLIC_SOCKETIO_URL:-http://localhost:5000}
+      JWT_SECRET: ${JWT_SECRET}
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  desktop_data:
+  mosquitto_data:
+  mosquitto_log:
