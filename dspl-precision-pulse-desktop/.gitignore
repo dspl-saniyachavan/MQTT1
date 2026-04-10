@@ -1,0 +1,35 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# uv
+.uv/
+
+# Data / databases
+data/
+*.db
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# SonarQube
+.scannerwork/
+
+# pytest
+.pytest_cache/

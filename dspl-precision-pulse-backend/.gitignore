@@ -1,0 +1,46 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# uv
+.uv/
+
+# Flask session data
+flask_session_data/
+
+# Data / databases
+data/
+*.db
+
+# TLS private keys (certs are committed, keys are not)
+config/*.key
+config/ca.key
+
+# Logs
+*.log
+backend.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# SonarQube
+.scannerwork/
+
+# pytest
+.pytest_cache/

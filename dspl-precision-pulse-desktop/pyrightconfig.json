@@ -1,0 +1,12 @@
+{
+  "pythonVersion": "3.10",
+  "pythonPlatform": "Linux",
+  "pythonPath": "/usr/bin/python3",
+  "venvPath": "/home/saniyachavani/.local/lib/python3.10/site-packages",
+  "extraPaths": [
+    "/home/saniyachavani/.local/lib/python3.10/site-packages"
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "none"
+}
