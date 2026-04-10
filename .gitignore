@@ -1,0 +1,38 @@
+# Environment secrets — never commit
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# SQLite databases
+*.db
+
+# Flask session data
+flask_session_data/
+
+# Node
+node_modules/
+.next/
+out/
+
+# SonarQube
+.scannerwork/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log

@@ -1,0 +1,131 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useSocketIO } from './useSocketIO';
+
+interface MqttStatusData {
+  status: 'online' | 'disconnected';
+  lastUpdate: number;
+  lastError?: string;
+}
+
+export function useMqttStatus() {
+  const { socket } = useSocketIO();
+  const [mqttStatus, setMqttStatus] = useState<'online' | 'disconnected'>('disconnected');
+  const [statusData, setStatusData] = useState<MqttStatusData>({
+    status: 'disconnected',
+    lastUpdate: Date.now()
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch MQTT status from API
+  const fetchMqttStatus = useCallback(async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch('http://localhost:5000/api/mqtt/status', {
+        headers: {
+          'Authorization': `Bearer ${token || ''}`
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        
+        // If backend responds, we're online
+        setMqttStatus('online');
+        setStatusData({
+          status: 'online',
+          lastUpdate: Date.now()
+        });
+        
+        console.log('[MQTT] Status: online');
+      } else {
+        // Backend unreachable
+        console.warn(`[MQTT] API returned status ${res.status}`);
+        setMqttStatus('disconnected');
+        setStatusData({
+          status: 'disconnected',
+          lastUpdate: Date.now(),
+          lastError: `HTTP ${res.status}`
+        });
+      }
+    } catch (err) {
+      console.error('[MQTT] Error fetching status:', err);
+      setMqttStatus('disconnected');
+      setStatusData({
+        status: 'disconnected',
+        lastUpdate: Date.now(),
+        lastError: err instanceof Error ? err.message : 'Unknown error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial fetch and polling
+  useEffect(() => {
+    fetchMqttStatus();
+    
+    // Poll status every 3 seconds
+    const pollInterval = setInterval(fetchMqttStatus, 3000);
+    
+    return () => clearInterval(pollInterval);
+  }, [fetchMqttStatus]);
+
+  // Listen to Socket.IO MQTT status events for instant updates
+  useEffect(() => {
+    if (!socket) {
+      console.log('[MQTT] Socket.IO not connected, using polling only');
+      return;
+    }
+
+    const handleMqttConnected = () => {
+      console.log('[MQTT] Connected event received');
+      setMqttStatus('online');
+      setStatusData({
+        status: 'online',
+        lastUpdate: Date.now()
+      });
+    };
+
+    const handleMqttDisconnected = (data?: any) => {
+      console.log('[MQTT] Disconnected event received:', data?.reason);
+      setMqttStatus('disconnected');
+      setStatusData({
+        status: 'disconnected',
+        lastUpdate: Date.now(),
+        lastError: data?.error || data?.reason
+      });
+    };
+
+    console.log('[MQTT] Registering Socket.IO event listeners');
+    
+    socket.on('mqtt_connected', handleMqttConnected);
+    socket.on('mqtt_disconnected', handleMqttDisconnected);
+
+    return () => {
+      console.log('[MQTT] Unregistering Socket.IO event listeners');
+      socket.off('mqtt_connected', handleMqttConnected);
+      socket.off('mqtt_disconnected', handleMqttDisconnected);
+    };
+  }, [socket]);
+
+  const getStatusLabel = useCallback(() => {
+    return mqttStatus === 'online' ? 'Connected' : 'Disconnected';
+  }, [mqttStatus]);
+
+  const getStatusColor = useCallback(() => {
+    return mqttStatus === 'online' 
+      ? { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', dot: 'bg-emerald-500' }
+      : { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', dot: 'bg-red-500' };
+  }, [mqttStatus]);
+
+  return {
+    mqttStatus,
+    statusData,
+    isLoading,
+    getStatusLabel,
+    getStatusColor,
+    isConnected: mqttStatus === 'online'
+  };
+}

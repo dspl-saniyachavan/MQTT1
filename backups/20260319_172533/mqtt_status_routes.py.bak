@@ -1,0 +1,42 @@
+from flask import Blueprint, jsonify
+from app.middleware.auth_middleware import token_required
+import logging
+
+logger = logging.getLogger(__name__)
+mqtt_status_bp = Blueprint('mqtt_status', __name__, url_prefix='/api/mqtt')
+
+@mqtt_status_bp.route('/status', methods=['GET'])
+@token_required
+def get_mqtt_status():
+    """Get current MQTT connection status"""
+    try:
+        # If this endpoint responds, backend is online
+        # MQTT is considered online if backend can respond
+        response = {
+            'mqtt_broker': 'online',
+            'backend_status': 'online',
+            'status': 'online'
+        }
+        
+        logger.info("MQTT status: online")
+        
+        # Broadcast status to all connected clients
+        from app import get_socketio
+        socketio = get_socketio()
+        if socketio:
+            socketio.emit('mqtt_status', {
+                'mqtt_broker': 'online',
+                'backend_status': 'online',
+                'status': 'online'
+            }, namespace='/')
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting MQTT status: {e}")
+        return jsonify({
+            'mqtt_broker': 'offline',
+            'backend_status': 'offline',
+            'status': 'offline',
+            'error': str(e)
+        }), 500
